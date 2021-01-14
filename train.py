@@ -11,33 +11,6 @@ from tqdm import tqdm
 from torch.nn import DataParallel
 from tokenizations.bpe_tokenizer import get_encoder
 
-
-def build_files(data_path, tokenized_data_path, num_pieces, full_tokenizer, min_length):
-    with open(data_path, 'r', encoding='utf8') as f:
-        print('reading lines')
-        lines = json.load(f)
-        lines = [line.replace('\n', ' [SEP] ') for line in lines]  # 用[SEP]表示换行, 段落之间使用SEP表示段落结束
-    all_len = len(lines)
-    if not os.path.exists(tokenized_data_path):
-        os.mkdir(tokenized_data_path)
-    for i in tqdm(range(num_pieces)):
-        sublines = lines[all_len // num_pieces * i: all_len // num_pieces * (i + 1)]
-        if i == num_pieces - 1:
-            sublines.extend(lines[all_len // num_pieces * (i + 1):])  # 把尾部例子添加到最后一个piece
-        sublines = [full_tokenizer.tokenize(line) for line in sublines if
-                    len(line) > min_length]  # 只考虑长度超过min_length的句子
-        sublines = [full_tokenizer.convert_tokens_to_ids(line) for line in sublines]
-        full_line = []
-        for subline in sublines:
-            full_line.append(full_tokenizer.convert_tokens_to_ids('[MASK]'))  # 文章开头添加MASK表示文章开始
-            full_line.extend(subline)
-            full_line.append(full_tokenizer.convert_tokens_to_ids('[CLS]'))  # 文章之间添加CLS表示文章结束
-        with open(tokenized_data_path + 'tokenized_train_{}.txt'.format(i), 'w') as f:
-            for id in full_line:
-                f.write(str(id) + ' ')
-    print('finish')
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', default='0,1,2,3', type=str, required=False, help='设置使用哪些显卡')
@@ -245,6 +218,34 @@ def main():
     model_to_save.save_pretrained(output_dir + 'final_model')
     # torch.save(scheduler.state_dict(), output_dir + 'final_model/scheduler.pt')
     # torch.save(optimizer.state_dict(), output_dir + 'final_model/optimizer.pt')
+
+
+
+def build_files(data_path, tokenized_data_path, num_pieces, full_tokenizer, min_length):
+    with open(data_path, 'r', encoding='utf8') as f:
+        print('reading lines')
+        lines = json.load(f)
+        lines = [line.replace('\n', ' [SEP] ') for line in lines]  # 用[SEP]表示换行, 段落之间使用SEP表示段落结束
+    all_len = len(lines)
+    if not os.path.exists(tokenized_data_path):
+        os.mkdir(tokenized_data_path)
+    for i in tqdm(range(num_pieces)):
+        sublines = lines[all_len // num_pieces * i: all_len // num_pieces * (i + 1)]
+        if i == num_pieces - 1:
+            sublines.extend(lines[all_len // num_pieces * (i + 1):])  # 把尾部例子添加到最后一个piece
+        sublines = [full_tokenizer.tokenize(line) for line in sublines if
+                    len(line) > min_length]  # 只考虑长度超过min_length的句子
+        sublines = [full_tokenizer.convert_tokens_to_ids(line) for line in sublines]
+        full_line = []
+        for subline in sublines:
+            full_line.append(full_tokenizer.convert_tokens_to_ids('[MASK]'))  # 文章开头添加MASK表示文章开始
+            full_line.extend(subline)
+            full_line.append(full_tokenizer.convert_tokens_to_ids('[CLS]'))  # 文章之间添加CLS表示文章结束
+        with open(tokenized_data_path + 'tokenized_train_{}.txt'.format(i), 'w') as f:
+            for id in full_line:
+                f.write(str(id) + ' ')
+    print('finish')
+
 
 
 if __name__ == '__main__':
